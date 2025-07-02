@@ -90,7 +90,6 @@ Desktop/
 ## 📝 License
 
 MIT License — Free to use, modify, and distribute with attribution.  
-Include a `LICENSE` file in your repo if you'd like this to be explicit.
 
 ---
 
