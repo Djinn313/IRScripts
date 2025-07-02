@@ -1,0 +1,277 @@
+// go build -o ir_collector ir_collector.go
+// sudo ./ir_collector
+// ir_collector.go
+
+package main
+
+import (
+	"archive/zip"
+	"bufio"
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
+	"html/template"
+	"io"
+	"log"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"time"
+)
+
+type HashRecord struct {
+	Path string
+	Hash string
+	Size int64
+}
+
+var hashResults []HashRecord
+
+func createOutputDir(path string) error {
+	return os.MkdirAll(path, 0755)
+}
+
+func runCmdToFile(cmdName string, args []string, outPath string) error {
+	cmd := exec.Command(cmdName, args...)
+	outfile, err := os.Create(outPath)
+	if err != nil {
+		return err
+	}
+	defer outfile.Close()
+
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return err
+	}
+
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+
+	scanner := bufio.NewScanner(stdout)
+	for scanner.Scan() {
+		outfile.WriteString(scanner.Text() + "\n")
+	}
+
+	return cmd.Wait()
+}
+
+func hashFile(path string) (string, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	hasher := sha256.New()
+	if _, err := io.Copy(hasher, file); err != nil {
+		return "", err
+	}
+
+	return hex.EncodeToString(hasher.Sum(nil)), nil
+}
+
+func logHashes(rootDir string, hashFile string) {
+	f, err := os.Create(hashFile)
+	if err != nil {
+		log.Printf("Could not create hash log: %v", err)
+		return
+	}
+	defer f.Close()
+
+	filepath.Walk(rootDir, func(path string, info os.FileInfo, err error) error {
+		if !info.IsDir() && !strings.HasSuffix(path, ".sha256.txt") {
+			hash, err := hashFile(path)
+			if err == nil {
+				relPath, _ := filepath.Rel(rootDir, path)
+				hashResults = append(hashResults, HashRecord{
+					Path: relPath,
+					Hash: hash,
+					Size: info.Size(),
+				})
+				f.WriteString(fmt.Sprintf("%s  %s\n", hash, relPath))
+			}
+		}
+		return nil
+	})
+}
+
+func generateHTMLReport(outputDir string) {
+	reportPath := filepath.Join(outputDir, "report.html")
+	f, err := os.Create(reportPath)
+	if err != nil {
+		log.Printf("Failed to create HTML report: %v", err)
+		return
+	}
+	defer f.Close()
+
+	tmpl := `
+	<html>
+	<head><title>IR Collection Report</title></head>
+	<body>
+	<h1>IR Collection Report</h1>
+	<p><b>Timestamp:</b> {{.Timestamp}}</p>
+	<h2>Collected Files (SHA256)</h2>
+	<table border="1" cellpadding="5">
+	<tr><th>File</th><th>Hash</th><th>Size (bytes)</th></tr>
+	{{range .Hashes}}
+	<tr><td>{{.Path}}</td><td>{{.Hash}}</td><td>{{.Size}}</td></tr>
+	{{end}}
+	</table>
+	</body>
+	</html>
+	`
+	t := template.Must(template.New("report").Parse(tmpl))
+	t.Execute(f, struct {
+		Timestamp string
+		Hashes    []HashRecord
+	}{
+		Timestamp: time.Now().Format(time.RFC3339),
+		Hashes:    hashResults,
+	})
+}
+
+func zipDir(source, target string) error {
+	zipfile, err := os.Create(target)
+	if err != nil {
+		return err
+	}
+	defer zipfile.Close()
+
+	archive := zip.NewWriter(zipfile)
+	defer archive.Close()
+
+	filepath.Walk(source, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if info.IsDir() {
+			return nil
+		}
+
+		relPath, err := filepath.Rel(source, path)
+		if err != nil {
+			return err
+		}
+
+		f, err := os.Open(path)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+
+		wr, err := archive.Create(relPath)
+		if err != nil {
+			return err
+		}
+		_, err = io.Copy(wr, f)
+		return err
+	})
+
+	return nil
+}
+
+func main() {
+	timestamp := time.Now().Format("20060102_150405")
+	outputDir := "ir_results_" + timestamp
+	err := createOutputDir(outputDir)
+	if err != nil {
+		log.Fatalf("Failed to create output directory: %v", err)
+	}
+
+	fmt.Println("🚀 Starting IR collection...")
+
+	// 1. Basic Info
+	os.WriteFile(filepath.Join(outputDir, "system_info.txt"),
+		[]byte(fmt.Sprintf("OS: %s\nArch: %s\nTime: %s\n", runtime.GOOS, runtime.GOARCH, time.Now().Format(time.RFC3339))),
+		0644)
+
+	// 2. Processes
+	if runtime.GOOS == "windows" {
+		runCmdToFile("tasklist", []string{"/FO", "LIST"}, filepath.Join(outputDir, "processes.txt"))
+	} else {
+		runCmdToFile("ps", []string{"aux"}, filepath.Join(outputDir, "processes.txt"))
+	}
+
+	// 3. Network
+	if runtime.GOOS == "windows" {
+		runCmdToFile("netstat", []string{"-ano"}, filepath.Join(outputDir, "network.txt"))
+	} else {
+		runCmdToFile("netstat", []string{"-tunap"}, filepath.Join(outputDir, "network.txt"))
+	}
+
+	// 4. Disk
+	if runtime.GOOS == "windows" {
+		runCmdToFile("wmic", []string{"logicaldisk", "get", "name,size,freespace"}, filepath.Join(outputDir, "disk.txt"))
+	} else {
+		runCmdToFile("df", []string{"-h"}, filepath.Join(outputDir, "disk.txt"))
+	}
+
+	// 5. Logged-in Users
+	if runtime.GOOS == "windows" {
+		runCmdToFile("query", []string{"user"}, filepath.Join(outputDir, "users.txt"))
+	} else {
+		runCmdToFile("who", nil, filepath.Join(outputDir, "users.txt"))
+	}
+
+	// 6. Logs
+	if runtime.GOOS == "windows" {
+		runCmdToFile("wevtutil", []string{"qe", "System", "/f:text", "/c:50"}, filepath.Join(outputDir, "logs.txt"))
+	} else if runtime.GOOS == "darwin" {
+		runCmdToFile("log", []string{"show", "--last", "1h"}, filepath.Join(outputDir, "logs.txt"))
+	} else {
+		runCmdToFile("journalctl", []string{"-n", "50"}, filepath.Join(outputDir, "logs.txt"))
+	}
+
+	// 7. Scheduled Tasks
+	if runtime.GOOS == "windows" {
+		runCmdToFile("schtasks", []string{"/query", "/fo", "LIST"}, filepath.Join(outputDir, "scheduled_tasks.txt"))
+	} else {
+		runCmdToFile("systemctl", []string{"list-timers", "--all"}, filepath.Join(outputDir, "scheduled_tasks.txt"))
+	}
+
+	// 8. Startup Programs
+	if runtime.GOOS == "windows" {
+		runCmdToFile("reg", []string{"query", `HKLM\Software\Microsoft\Windows\CurrentVersion\Run`}, filepath.Join(outputDir, "autoruns.txt"))
+	} else {
+		runCmdToFile("ls", []string{"-la", "/etc/init.d"}, filepath.Join(outputDir, "autoruns.txt"))
+	}
+
+	// 9. USB Devices
+	if runtime.GOOS == "windows" {
+		runCmdToFile("powershell", []string{"Get-PnpDevice -Class DiskDrive | Format-Table -AutoSize"}, filepath.Join(outputDir, "usb_devices.txt"))
+	} else if runtime.GOOS == "darwin" {
+		runCmdToFile("system_profiler", []string{"SPUSBDataType"}, filepath.Join(outputDir, "usb_devices.txt"))
+	} else {
+		runCmdToFile("lsusb", nil, filepath.Join(outputDir, "usb_devices.txt"))
+	}
+
+	// 10. File Access Logs
+	if runtime.GOOS == "darwin" {
+		runCmdToFile("fs_usage", []string{"-w", "-f", "filesys"}, filepath.Join(outputDir, "file_access.txt"))
+	} else if runtime.GOOS == "linux" {
+		runCmdToFile("ausearch", []string{"-k", "access", "-ts", "recent"}, filepath.Join(outputDir, "file_access.txt"))
+	} else {
+		os.WriteFile(filepath.Join(outputDir, "file_access.txt"), []byte("File access logs not available on this OS."), 0644)
+	}
+
+	// 11. Hashing
+	logHashes(outputDir, filepath.Join(outputDir, "file_hashes.sha256.txt"))
+
+	// 12. HTML Report
+	generateHTMLReport(outputDir)
+
+	// 13. ZIP
+	err = zipDir(outputDir, outputDir+".zip")
+	if err != nil {
+		log.Printf("Failed to create ZIP: %v", err)
+	}
+
+	fmt.Println("✅ IR collection complete.")
+	fmt.Printf("📁 Output folder: %s\n", outputDir)
+	fmt.Printf("📦 ZIP archive: %s.zip\n", outputDir)
+	fmt.Printf("📝 Report: %s/report.html\n", outputDir)
+}
