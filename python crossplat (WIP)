@@ -1,0 +1,426 @@
+#!/usr/bin/env python3
+"""
+Cross-Platform Digital Forensics and Incident Response (DFIR) Collection Script
+By: [Your Name]
+Version: 1.0
+Description: Comprehensive evidence collection tool for Windows, Linux, and macOS
+"""
+
+import os
+import sys
+import platform
+import subprocess
+import datetime
+import hashlib
+import json
+import shutil
+import socket
+import psutil
+import argparse
+from pathlib import Path
+import logging
+
+class DFIRCollector:
+    def __init__(self):
+        self.system = platform.system().lower()
+        self.case_info = {}
+        self.evidence_dir = None
+        self.log_file = None
+        self.collected_files = []
+        
+    def setup_logging(self, evidence_dir):
+        """Setup logging configuration"""
+        log_file = os.path.join(evidence_dir, 'collection.log')
+        logging.basicConfig(
+            level=logging.INFO,
+            format='%(asctime)s - %(levelname)s - %(message)s',
+            handlers=[
+                logging.FileHandler(log_file),
+                logging.StreamHandler()
+            ]
+        )
+        self.log_file = log_file
+        return logging.getLogger(__name__)
+
+    def get_case_info(self):
+        """Collect case information from user"""
+        print("="*60)
+        print("DFIR Evidence Collection Tool")
+        print("="*60)
+        print("This program collects critical volatile and non-volatile data")
+        
+        continue_choice = input("Do you wish to continue? (y/n): ").lower()
+        if continue_choice not in ['y', 'yes']:
+            print("Exiting...")
+            sys.exit(0)
+            
+        self.case_info = {
+            'investigator_name': input('Investigator Name: '),
+            'case_name': input('Case Name: '),
+            'case_date': input('Case Date (YYYY-MM-DD): '),
+            'case_time': input('Case Time (HH:MM): '),
+            'collection_date': datetime.datetime.now().isoformat(),
+            'system_info': {
+                'hostname': socket.gethostname(),
+                'platform': platform.platform(),
+                'system': platform.system(),
+                'release': platform.release(),
+                'version': platform.version(),
+                'machine': platform.machine(),
+                'processor': platform.processor()
+            }
+        }
+
+    def create_evidence_directory(self):
+        """Create directory structure for evidence collection"""
+        folder_name = input('Folder name to store collected data: ')
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        self.evidence_dir = f"{folder_name}_{timestamp}"
+        
+        try:
+            os.makedirs(self.evidence_dir, exist_ok=True)
+            os.makedirs(os.path.join(self.evidence_dir, 'volatile'), exist_ok=True)
+            os.makedirs(os.path.join(self.evidence_dir, 'non_volatile'), exist_ok=True)
+            os.makedirs(os.path.join(self.evidence_dir, 'logs'), exist_ok=True)
+            os.makedirs(os.path.join(self.evidence_dir, 'network'), exist_ok=True)
+            os.makedirs(os.path.join(self.evidence_dir, 'system'), exist_ok=True)
+            os.makedirs(os.path.join(self.evidence_dir, 'memory'), exist_ok=True)
+            print(f"Evidence directory '{self.evidence_dir}' created successfully")
+        except Exception as e:
+            print(f"Error creating evidence directory: {e}")
+            sys.exit(1)
+
+    def run_command(self, command, output_file=None, shell=True):
+        """Execute system command and capture output"""
+        try:
+            if isinstance(command, str):
+                result = subprocess.run(command, shell=shell, capture_output=True, 
+                                      text=True, timeout=300)
+            else:
+                result = subprocess.run(command, capture_output=True, text=True, timeout=300)
+            
+            if output_file:
+                with open(output_file, 'w', encoding='utf-8', errors='ignore') as f:
+                    f.write(f"Command: {command}\n")
+                    f.write(f"Exit Code: {result.returncode}\n")
+                    f.write(f"Timestamp: {datetime.datetime.now()}\n")
+                    f.write("-" * 50 + "\n")
+                    f.write(result.stdout)
+                    if result.stderr:
+                        f.write("\nSTDERR:\n" + result.stderr)
+                        
+            return result.stdout, result.stderr, result.returncode
+        except subprocess.TimeoutExpired:
+            return None, "Command timed out", -1
+        except Exception as e:
+            return None, str(e), -1
+
+    def collect_volatile_data(self, logger):
+        """Collect volatile system data"""
+        logger.info("Starting volatile data collection")
+        volatile_dir = os.path.join(self.evidence_dir, 'volatile')
+        
+        # System date and time
+        logger.info("Collecting system date/time")
+        with open(os.path.join(volatile_dir, 'datetime.txt'), 'w') as f:
+            f.write(f"Collection Time: {datetime.datetime.now()}\n")
+            f.write(f"System Time: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+        
+        # Running processes
+        logger.info("Collecting running processes")
+        self.collect_processes(volatile_dir)
+        
+        # Network connections
+        logger.info("Collecting network connections")
+        self.collect_network_info(volatile_dir)
+        
+        # System users
+        logger.info("Collecting logged-in users")
+        self.collect_user_info(volatile_dir)
+        
+        # Memory information
+        logger.info("Collecting memory information")
+        self.collect_memory_info(volatile_dir)
+
+    def collect_processes(self, output_dir):
+        """Collect running process information"""
+        processes_file = os.path.join(output_dir, 'processes.txt')
+        
+        try:
+            with open(processes_file, 'w') as f:
+                f.write("Running Processes\n")
+                f.write("=" * 50 + "\n")
+                
+                for proc in psutil.process_iter(['pid', 'name', 'username', 'cmdline', 'create_time']):
+                    try:
+                        proc_info = proc.info
+                        f.write(f"PID: {proc_info['pid']}\n")
+                        f.write(f"Name: {proc_info['name']}\n")
+                        f.write(f"User: {proc_info['username']}\n")
+                        f.write(f"Command: {' '.join(proc_info['cmdline']) if proc_info['cmdline'] else 'N/A'}\n")
+                        f.write(f"Start Time: {datetime.datetime.fromtimestamp(proc_info['create_time'])}\n")
+                        f.write("-" * 30 + "\n")
+                    except (psutil.NoSuchProcess, psutil.AccessDenied):
+                        continue
+                        
+        except Exception as e:
+            print(f"Error collecting processes: {e}")
+
+    def collect_network_info(self, output_dir):
+        """Collect network connection information"""
+        network_file = os.path.join(output_dir, 'network_connections.txt')
+        
+        try:
+            with open(network_file, 'w') as f:
+                f.write("Network Connections\n")
+                f.write("=" * 50 + "\n")
+                
+                connections = psutil.net_connections(kind='inet')
+                for conn in connections:
+                    f.write(f"Family: {conn.family}\n")
+                    f.write(f"Type: {conn.type}\n")
+                    f.write(f"Local Address: {conn.laddr}\n")
+                    f.write(f"Remote Address: {conn.raddr}\n")
+                    f.write(f"Status: {conn.status}\n")
+                    f.write(f"PID: {conn.pid}\n")
+                    f.write("-" * 30 + "\n")
+                    
+        except Exception as e:
+            print(f"Error collecting network info: {e}")
+
+    def collect_user_info(self, output_dir):
+        """Collect logged-in user information"""
+        users_file = os.path.join(output_dir, 'users.txt')
+        
+        try:
+            with open(users_file, 'w') as f:
+                f.write("Logged-in Users\n")
+                f.write("=" * 50 + "\n")
+                
+                users = psutil.users()
+                for user in users:
+                    f.write(f"Name: {user.name}\n")
+                    f.write(f"Terminal: {user.terminal}\n")
+                    f.write(f"Host: {user.host}\n")
+                    f.write(f"Started: {datetime.datetime.fromtimestamp(user.started)}\n")
+                    f.write("-" * 30 + "\n")
+                    
+        except Exception as e:
+            print(f"Error collecting user info: {e}")
+
+    def collect_memory_info(self, output_dir):
+        """Collect memory usage information"""
+        memory_file = os.path.join(output_dir, 'memory.txt')
+        
+        try:
+            with open(memory_file, 'w') as f:
+                memory = psutil.virtual_memory()
+                swap = psutil.swap_memory()
+                
+                f.write("Memory Information\n")
+                f.write("=" * 50 + "\n")
+                f.write(f"Total Memory: {memory.total / (1024**3):.2f} GB\n")
+                f.write(f"Available Memory: {memory.available / (1024**3):.2f} GB\n")
+                f.write(f"Memory Percent Used: {memory.percent}%\n")
+                f.write(f"Swap Total: {swap.total / (1024**3):.2f} GB\n")
+                f.write(f"Swap Used: {swap.used / (1024**3):.2f} GB\n")
+                f.write(f"Swap Percent: {swap.percent}%\n")
+                
+        except Exception as e:
+            print(f"Error collecting memory info: {e}")
+
+    def collect_system_info(self, logger):
+        """Collect system configuration and information"""
+        logger.info("Starting system information collection")
+        system_dir = os.path.join(self.evidence_dir, 'system')
+        
+        # System information
+        system_file = os.path.join(system_dir, 'system_info.txt')
+        with open(system_file, 'w') as f:
+            f.write("System Information\n")
+            f.write("=" * 50 + "\n")
+            for key, value in self.case_info['system_info'].items():
+                f.write(f"{key}: {value}\n")
+        
+        # Environment variables
+        env_file = os.path.join(system_dir, 'environment.txt')
+        with open(env_file, 'w') as f:
+            f.write("Environment Variables\n")
+            f.write("=" * 50 + "\n")
+            for key, value in os.environ.items():
+                f.write(f"{key}={value}\n")
+
+    def collect_system_specific_data(self, logger):
+        """Collect OS-specific data"""
+        if self.system == 'linux':
+            self.collect_linux_data(logger)
+        elif self.system == 'windows':
+            self.collect_windows_data(logger)
+        elif self.system == 'darwin':  # macOS
+            self.collect_macos_data(logger)
+
+    def collect_linux_data(self, logger):
+        """Collect Linux-specific data"""
+        logger.info("Collecting Linux-specific data")
+        logs_dir = os.path.join(self.evidence_dir, 'logs')
+        
+        # Copy important log files
+        log_files = [
+            '/var/log/auth.log',
+            '/var/log/syslog',
+            '/var/log/messages',
+            '/var/log/kern.log',
+            '/var/log/secure'
+        ]
+        
+        for log_file in log_files:
+            if os.path.exists(log_file):
+                try:
+                    shutil.copy2(log_file, logs_dir)
+                    logger.info(f"Copied {log_file}")
+                except Exception as e:
+                    logger.error(f"Failed to copy {log_file}: {e}")
+        
+        # Copy passwd file
+        try:
+            shutil.copy2('/etc/passwd', os.path.join(self.evidence_dir, 'system'))
+            logger.info("Copied /etc/passwd")
+        except Exception as e:
+            logger.error(f"Failed to copy /etc/passwd: {e}")
+
+    def collect_windows_data(self, logger):
+        """Collect Windows-specific data"""
+        logger.info("Collecting Windows-specific data")
+        system_dir = os.path.join(self.evidence_dir, 'system')
+        
+        # Windows event logs
+        commands = {
+            'system_events': 'wevtutil qe System /f:text',
+            'security_events': 'wevtutil qe Security /f:text',
+            'application_events': 'wevtutil qe Application /f:text'
+        }
+        
+        for name, cmd in commands.items():
+            output_file = os.path.join(system_dir, f'{name}.txt')
+            self.run_command(cmd, output_file)
+
+    def collect_macos_data(self, logger):
+        """Collect macOS-specific data"""
+        logger.info("Collecting macOS-specific data")
+        logs_dir = os.path.join(self.evidence_dir, 'logs')
+        
+        # macOS system logs
+        commands = {
+            'system_log': 'log show --last 24h',
+            'console_log': 'syslog -k Time ge -24H'
+        }
+        
+        for name, cmd in commands.items():
+            output_file = os.path.join(logs_dir, f'{name}.txt')
+            self.run_command(cmd, output_file)
+
+    def calculate_hash(self, file_path):
+        """Calculate SHA-256 hash of a file"""
+        sha256_hash = hashlib.sha256()
+        try:
+            with open(file_path, "rb") as f:
+                for chunk in iter(lambda: f.read(4096), b""):
+                    sha256_hash.update(chunk)
+            return sha256_hash.hexdigest()
+        except Exception:
+            return None
+
+    def create_evidence_report(self, logger):
+        """Create final evidence collection report"""
+        logger.info("Creating evidence collection report")
+        
+        report_file = os.path.join(self.evidence_dir, 'evidence_report.json')
+        
+        # Calculate hashes for all collected files
+        file_hashes = {}
+        for root, dirs, files in os.walk(self.evidence_dir):
+            for file in files:
+                if file != 'evidence_report.json':
+                    file_path = os.path.join(root, file)
+                    rel_path = os.path.relpath(file_path, self.evidence_dir)
+                    file_hash = self.calculate_hash(file_path)
+                    if file_hash:
+                        file_hashes[rel_path] = {
+                            'sha256': file_hash,
+                            'size': os.path.getsize(file_path),
+                            'modified': datetime.datetime.fromtimestamp(
+                                os.path.getmtime(file_path)).isoformat()
+                        }
+        
+        report = {
+            'case_information': self.case_info,
+            'collection_summary': {
+                'start_time': self.case_info['collection_date'],
+                'end_time': datetime.datetime.now().isoformat(),
+                'files_collected': len(file_hashes),
+                'evidence_directory': self.evidence_dir
+            },
+            'file_hashes': file_hashes
+        }
+        
+        with open(report_file, 'w') as f:
+            json.dump(report, f, indent=2)
+            
+        logger.info(f"Evidence report created: {report_file}")
+
+    def run_collection(self):
+        """Main collection process"""
+        try:
+            # Get case information
+            self.get_case_info()
+            
+            # Create evidence directory
+            self.create_evidence_directory()
+            
+            # Setup logging
+            logger = self.setup_logging(self.evidence_dir)
+            
+            logger.info("Starting DFIR evidence collection")
+            logger.info(f"Case: {self.case_info['case_name']}")
+            logger.info(f"Investigator: {self.case_info['investigator_name']}")
+            
+            input("Press Enter to begin data collection...")
+            
+            # Collect different types of evidence
+            self.collect_volatile_data(logger)
+            self.collect_system_info(logger)
+            self.collect_system_specific_data(logger)
+            
+            # Create final report
+            self.create_evidence_report(logger)
+            
+            logger.info("Evidence collection completed successfully")
+            print(f"\nCollection completed. Evidence stored in: {self.evidence_dir}")
+            print(f"Log file: {self.log_file}")
+            
+        except KeyboardInterrupt:
+            print("\nCollection interrupted by user")
+            sys.exit(1)
+        except Exception as e:
+            print(f"Error during collection: {e}")
+            sys.exit(1)
+
+def main():
+    parser = argparse.ArgumentParser(description='Cross-Platform DFIR Collection Tool')
+    parser.add_argument('--version', action='version', version='DFIR Collector 1.0')
+    args = parser.parse_args()
+    
+    # Check if running as administrator/root
+    if os.name == 'nt':  # Windows
+        import ctypes
+        if not ctypes.windll.shell32.IsUserAnAdmin():
+            print("Warning: Running without administrator privileges may limit data collection")
+    else:  # Unix-like systems
+        if os.geteuid() != 0:
+            print("Warning: Running without root privileges may limit data collection")
+    
+    collector = DFIRCollector()
+    collector.run_collection()
+
+if __name__ == "__main__":
+    main()
