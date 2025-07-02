@@ -64,7 +64,7 @@ These tools are designed to preserve relevant data in a structured format for po
 
 ---
 
-### 🐍 3. Python Script (`dfir_collector.py`)
+### 🐍 3. Python Script (WIP) (`dfir_collector.py`)
 
 - **Platform:** Cross-platform (Windows, Linux, macOS)  
 - **Purpose:** Comprehensive evidence collection tool capturing volatile data (processes, network connections, logged-in users, memory info), system configuration, environment variables, and OS-specific logs (Windows event logs, Linux syslogs, macOS unified logs).  
