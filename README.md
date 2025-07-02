@@ -8,14 +8,12 @@
 
 ---
 
-## 📁 Overview
-
-This repository contains two scripts designed to collect volatile and non-volatile system data during an active incident:
-
-- `windows_ir.ps1`: A PowerShell script for gathering a wide range of Windows forensic artifacts.
-- `linux_ir.sh`: A Bash script for collecting key Linux forensic artifacts via a guided terminal interface.
-
-These tools are designed to preserve relevant data in a structured format for post-collection analysis, timeline reconstruction, and threat hunting.
+📁 Contents
+Script	Language	Platforms	Description
+windows-ir.ps1	PowerShell	🪟 Windows	Collects host/network/process/system artifacts
+linux-ir.sh	Bash	🐧 Linux	Collects volatile & non-volatile system data
+cross_platform_ir.py	Python	🪟 🐧 🍎	Fully interactive IR collector with structured output
+ir_collector.go	Go	🪟 🐧 🍎	High-performance CLI IR collector with HTML/ZIP reporting
 
 ---
 
@@ -75,6 +73,51 @@ These tools are designed to preserve relevant data in a structured format for po
   - SHA-256 hashing of collected files with a final JSON evidence report 🔒  
 - **Usage:** Run with **Administrator/root** privileges recommended.  
 - **Output:** Timestamped evidence folder with organized artifacts and reports.
+
+---
+
+🦫 Go – ir_collector.go
+
+✅ Feature	📝 Description
+🔍 Process Listing	Lists running processes
+🌐 Network Activity	Captures open connections
+🧠 Memory & Disk	Captures RAM + disk usage
+🔐 Hashing	SHA-256 for evidence integrity
+🔄 Autoruns	Gathers startup items
+🔌 USB Devices	Enumerates recent removable media
+🧾 Logs	Gathers system logs
+🧠 File Access Logs	Pulls auditd / fs_usage or equivalent logs
+📄 HTML Report	Generates readable summary
+🗜️ ZIP Archive	Optionally compresses all output
+
+📂 Output Example:
+
+ir_results_20250702_150405/
+├── processes.txt
+├── usb_devices.txt
+├── system_info.txt
+├── report.html
+├── file_hashes.sha256.txt
+└── ir_results_20250702_150405.zip
+
+🧪 Platform Support:
+
+    ✅ Windows (wmic, wevtutil, schtasks)
+
+    ✅ Linux (journalctl, auditd, /etc/passwd)
+
+    ✅ macOS (log, fs_usage, system_profiler)
+
+⚠️ Run with sudo or Admin rights for full collection
+🧰 Requirements
+
+    PowerShell scripts: Windows 10+, Admin rights
+
+    Bash script: Linux with coreutils, ifconfig, netstat, cp
+
+    Python script: Python 3.6+, psutil, cross-platform
+
+    Go script: Go 1.18+, statically compiled binary
 
 ---
 
