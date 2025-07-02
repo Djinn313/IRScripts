@@ -76,7 +76,7 @@ ir_collector.go	Go	🪟 🐧 🍎	High-performance CLI IR collector with HTML/ZI
 
 ---
 
-🦫 Go – ir_collector.go
+🦫 Go – Go_IRscript.go
 
 ✅ Feature	📝 Description
 🔍 Process Listing	Lists running processes
@@ -89,16 +89,6 @@ ir_collector.go	Go	🪟 🐧 🍎	High-performance CLI IR collector with HTML/ZI
 🧠 File Access Logs	Pulls auditd / fs_usage or equivalent logs
 📄 HTML Report	Generates readable summary
 🗜️ ZIP Archive	Optionally compresses all output
-
-📂 Output Example:
-
-ir_results_20250702_150405/
-├── processes.txt
-├── usb_devices.txt
-├── system_info.txt
-├── report.html
-├── file_hashes.sha256.txt
-└── ir_results_20250702_150405.zip
 
 🧪 Platform Support:
 
