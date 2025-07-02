@@ -62,7 +62,7 @@ ir_collector.go	Go	🪟 🐧 🍎	High-performance CLI IR collector with HTML/ZI
 
 ---
 
-### 🐍 3. Python Script (WIP) (`dfir_collector.py`)
+### 🐍 Python Script (WIP) (`dfir_collector.py`)
 
 - **Platform:** Cross-platform (Windows, Linux, macOS)  
 - **Purpose:** Comprehensive evidence collection tool capturing volatile data (processes, network connections, logged-in users, memory info), system configuration, environment variables, and OS-specific logs (Windows event logs, Linux syslogs, macOS unified logs).  
@@ -76,7 +76,7 @@ ir_collector.go	Go	🪟 🐧 🍎	High-performance CLI IR collector with HTML/ZI
 
 ---
 
-🦫 Go – Go_IRscript.go
+### 🦫 Go – Go_IRscript.go
 
 ✅ Feature	📝 Description
 🔍 Process Listing	Lists running processes
