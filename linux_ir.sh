@@ -1,7 +1,7 @@
 #!/bin/bash
 #IR collection Script
 #By Mike Sayegh
-#Run this program from the directory it is in ./mike
+#Run this program from the directory it is in
 clear
 echo 'This program collects critical volatile and non-volatile data'
 read -p 'Do you wish to continue?' c_answer
