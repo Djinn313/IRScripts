@@ -58,7 +58,7 @@ These tools are designed to preserve relevant data in a structured format for po
   - Dumps shell environment variables
 
 **Requirements:**
-- Root privileges
+- Root/Sudo privileges
 - A local `Tools/` folder with symbolic links or copies of Linux system binaries (e.g., `netstat`, `hostname`, `cp`, etc.)
 - Bash-compatible environment
 
