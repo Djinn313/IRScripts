@@ -99,7 +99,6 @@ ir_collector.go	Go	🪟 🐧 🍎	High-performance CLI IR collector with HTML/ZI
     ✅ macOS (log, fs_usage, system_profiler)
 
 ⚠️ Run with sudo or Admin rights for full collection
-🧰 Requirements
 
     PowerShell scripts: Windows 10+, Admin rights
 
