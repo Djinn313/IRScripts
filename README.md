@@ -64,24 +64,23 @@ These tools are designed to preserve relevant data in a structured format for po
 
 ---
 
-## 🧰 Output Example (Windows)
+### 🐍 3. Python Script (`dfir_collector.py`)
 
-Desktop/
-└── IR results/
-├── SystemData.csv
-├── Active TCP.csv
-├── DNSCache.txt
-├── Processes.txt
-├── Startup_Programs_Report.html
-├── GroupPolicySettings.xml
-└── ... 
-
+- **Platform:** Cross-platform (Windows, Linux, macOS)  
+- **Purpose:** Comprehensive evidence collection tool capturing volatile data (processes, network connections, logged-in users, memory info), system configuration, environment variables, and OS-specific logs (Windows event logs, Linux syslogs, macOS unified logs).  
+- **Features:**  
+  - Interactive case and investigator metadata input 📝  
+  - Structured directory output separating volatile, non-volatile, logs, memory, network, and system data 📁  
+  - Detailed logging of collection steps 📜  
+  - SHA-256 hashing of collected files with a final JSON evidence report 🔒  
+- **Usage:** Run with **Administrator/root** privileges recommended.  
+- **Output:** Timestamped evidence folder with organized artifacts and reports.
 
 ---
 
 ## ⚠️ Notes
 
-- **Run with elevated privileges** (`Administrator` on Windows, `root` on Linux) for full access to system data.
+- **Run with elevated privileges** (`Administrator` on Windows, `root` or `sudo` on Linux) for full access to system data.
 - Scripts are intended for **incident response and evidence preservation**, not remediation.
 - Output should be secured, hashed, and backed up as part of chain-of-custody procedures if used in legal contexts.
 
@@ -89,7 +88,7 @@ Desktop/
 
 ## 📝 License
 
-MIT License — Free to use, modify, and distribute with attribution.  
+Free to use, modify, and distribute with attribution.  
 
 ---
 
